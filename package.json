@@ -1,0 +1,16 @@
+{
+  "name": "pandabot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "pandabot.js",
+  "scripts": {
+    "start": "node pandabot.js"
+  },
+  "author": "Rak Acme Inc",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^12.5.3",
+    "mysql2": "^2.2.5",
+    "node-fetch": "^2.6.1"
+  }
+}
