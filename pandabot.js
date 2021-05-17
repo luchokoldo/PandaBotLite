@@ -10,7 +10,7 @@ var gData
 
 const TXPRICE = 0.00002100, CREATE = 0, UPDATE = 1
 
-const APIKEY = 'UUUCXCGM5QMTI8JQJR2VGJ9YNV7KZ3HNQU', GASROLE = 'GasNotification'
+const APIKEY = process.env.API, GASROLE = 'GasNotification'
 
 var MsgText, BotMsgText;
 
@@ -118,10 +118,32 @@ client.on('message', async (message) => {
         }
         else if (MsgText.startsWith(`${gData.cmdPrefix}pandahelp`)) {
 
-            message.channel.send(`Comandos disponibles: \n${gData.cmdPrefix}pandabot: Muestra el Autor y la Version del bot\n${gData.cmdPrefix}register: Agregar canal para que solo el bot publique y el rol de notificacion\n${gData.cmdPrefix}unregister: Remueve el canal agregado al bot y el rol\n${gData.cmdPrefix}update: Actualiza los datos`)
+            message.channel.send(`Comandos disponibles: \n
+            ${gData.cmdPrefix}pandabot: Muestra el Autor y la Version del bot\n
+            ${gData.cmdPrefix}register: Agregar canal para que solo el bot publique y el rol de notificacion\n
+            ${gData.cmdPrefix}unregister: Remueve el canal agregado al bot y el rol\n
+            ${gData.cmdPrefix}update: Actualiza los datos\n
+            ${gData.cmdPrefix}gasprice: Cambia el valor para mandar la alerta; si el valor Avg es igual o menor, envia la alerta uso: ${gData.cmdPrefix}gasprice 50\n
+            ${gData.cmdPrefix}pbprefix: Cambia el prefijo de los comandos; uso: ${gData.cmdPrefix}pbprefix !!\n`)
 
             return
 
+        }
+        else if (MsgText.startsWith(`${gData.cmdPrefix}pbprefix`)) {
+
+            message.delete();
+    
+            let buffer = MsgText.split(' ')
+    
+            if (buffer[1]) {
+    
+                gData.cmdPrefix = buffer[1]
+    
+                await db.query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${gData.cmdPrefix}' WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
+    
+            }
+    
+            return
         }
         else if (MsgText.startsWith(`${gData.cmdPrefix}register`) && message.member.hasPermission("ADMINISTRATOR")) {
 
@@ -222,7 +244,7 @@ client.on('message', async (message) => {
 
         return
     }
-
+    
     if (message.channel.id == gData.channelId)
         message.delete();
 })
@@ -323,6 +345,13 @@ function GetText(h_message, type) {
 
     fetch(`https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey=${APIKEY}`).then(resp => resp.json()).then(webMsg => {
 
+        if (webMsg.message != 'OK') {
+
+            setTimeout(GetText, 5000, h_message, type)
+
+            return
+        }
+
         lowGwei = Number(webMsg.result.SafeGasPrice)
 
         avgGwei = Number(webMsg.result.ProposeGasPrice)
@@ -333,9 +362,23 @@ function GetText(h_message, type) {
 
         fetch(`https://api.etherscan.io/api?module=stats&action=ethprice&apikey=${APIKEY}`).then(resp => resp.json()).then(webMsg => {
 
+            if (webMsg.message != 'OK') {
+
+                setTimeout(GetText, 5000, h_message, type)
+
+                return
+            }
+
             ethPrice = Number(webMsg.result.ethusd).toFixed(0)
 
             fetch(`https://api.etherscan.io/api?module=block&action=getblockreward&blockno=${lastBlock}&apikey=${APIKEY}`).then(resp => resp.json()).then(webMsg => {
+
+                if (webMsg.message != 'OK') {
+
+                    setTimeout(GetText, 5000, h_message, type)
+    
+                    return
+                }
 
                 blockReward = (Number(webMsg.result.blockReward) * 0.000000000000000001).toFixed(2)
 
