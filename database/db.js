@@ -1,5 +1,6 @@
 const Database = require("mysql2/promise")
 const Config = require("./dbconfig.json")
+require('dotenv').config()
 
 Config['db_host'] = process.env.HOST
 Config['db_user'] = process.env.USER

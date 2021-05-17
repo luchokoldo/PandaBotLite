@@ -2,6 +2,7 @@ const Discord = require('discord.js');
 const fetch = require('node-fetch')
 const pjson = require('./package.json');
 const dbConfig = require("./database/dbconfig.json");
+require('dotenv').config()
 
 const client = new Discord.Client({ partials: ['MESSAGE', 'REACTION'] });
 const guildsData = new Map()
@@ -51,6 +52,8 @@ client.on('ready', () => {
     client.guilds.cache.forEach(guild => {
 
         db.query(`SELECT * FROM ${dbConfig.db_tableS} WHERE guildId = '${guild.id}';`).then(result => {
+
+            gData
 
             if (result[0][0].channelId === '') {
 
@@ -132,17 +135,17 @@ client.on('message', async (message) => {
         else if (MsgText.startsWith(`${gData.cmdPrefix}pbprefix`)) {
 
             message.delete();
-    
+
             let buffer = MsgText.split(' ')
-    
+
             if (buffer[1]) {
-    
+
                 gData.cmdPrefix = buffer[1]
-    
+
                 await db.query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${gData.cmdPrefix}' WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
-    
+
             }
-    
+
             return
         }
         else if (MsgText.startsWith(`${gData.cmdPrefix}register`) && message.member.hasPermission("ADMINISTRATOR")) {
@@ -219,6 +222,8 @@ client.on('message', async (message) => {
 
         gData.msgId = ''
 
+        gData.notiMsgId = ''
+
         await db.query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${gData.cmdPrefix}', msgId='', notiMsgId='', channelId='' WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
 
         let role = message.guild.roles.cache.find(role => role.name === GASROLE)
@@ -244,9 +249,88 @@ client.on('message', async (message) => {
 
         return
     }
-    
+    else if (MsgText.startsWith(`${gData.cmdPrefix}restart`)) {
+
+        message.delete();
+
+        let role = message.guild.roles.cache.find(role => role.name === GASROLE)
+
+        if (role != null)
+            role.delete()
+
+        gData.notiMsgMax = 60
+
+        gData.channelId = ''
+
+        gData.intervalId = ''
+
+        gData.msgId = ''
+
+        gData.notiMsgId = ''
+
+        clearInterval(gData.intervalId)
+
+        await db.query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='!', msgId='', notiMsgId='', notiMsgMax='60', channelId='' WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
+    }
+
     if (message.channel.id == gData.channelId)
         message.delete();
+})
+
+client.on('guildDelete', async (guild) => {
+
+    await db.query(`DELETE FROM ${dbConfig.db_tableS} WHERE guildId=${guild.id};`).catch(error => console.log(error))
+
+})
+
+client.on('messageDelete', async (message) => {
+
+    if (!message.client.user.bot) {
+
+        gData = guildsData.get(message.guild.id)
+
+        if (message.id != gData.msgId && message.id != gData.notiMsgId)
+            return
+        else if(message.id === gData.notiMsgId) {
+
+            gData.notiMsgId = ''
+
+            return
+        }
+
+        gData.channelId = ''
+
+        clearInterval(gData.intervalId)
+
+        gData.intervalId = ''
+
+        message.channel.messages.fetch(gData.msgId).then(msgid => {
+
+            if (msgid)
+                msgid.delete().catch(error => console.log(error))
+
+        }).catch(error => console.log(error))
+
+        message.channel.messages.fetch(gData.notiMsgId).then(msgid => {
+
+            if (msgid)
+                msgid.delete().catch(error => console.log(error))
+
+        }).catch(error => console.log(error))
+
+        gData.msgId = ''
+
+        gData.notiMsgId = ''
+
+        await db.query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${gData.cmdPrefix}', msgId='', notiMsgId='', channelId='' WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
+
+        let role = message.guild.roles.cache.find(role => role.name === GASROLE)
+
+        if (role != null)
+            role.delete()
+
+    }
+
 })
 
 client.on('messageReactionAdd', async (reaction, user) => {
@@ -269,7 +353,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
 
     }
 
-    let aData = guildsData.get(reaction.message.guild.id)
+    gData = guildsData.get(reaction.message.guild.id)
 
     if (reaction.message.partial) {
 
@@ -277,14 +361,14 @@ client.on('messageReactionAdd', async (reaction, user) => {
 
             let msg = await reaction.message.fetch()
 
-            if (msg.id === aData.msgId)
+            if (msg.id === gData.msgId)
                 ApplyRole()
 
         }
         catch (error) { console.log(error) }
     }
     else
-        if (reaction.message.id === aData.msgId)
+        if (reaction.message.id === gData.msgId)
             ApplyRole()
 
 })
@@ -309,7 +393,7 @@ client.on('messageReactionRemove', async (reaction, user) => {
 
     }
 
-    let aData = guildsData.get(reaction.message.guild.id)
+    gData = guildsData.get(reaction.message.guild.id)
 
     if (reaction.message.partial) {
 
@@ -317,14 +401,14 @@ client.on('messageReactionRemove', async (reaction, user) => {
 
             let msg = await reaction.message.fetch()
 
-            if (msg.id === aData.msgId)
+            if (msg.id === gData.msgId)
                 RemoveRole()
 
         }
         catch (error) { console.log(error) }
     }
     else
-        if (reaction.message.id === aData.msgId)
+        if (reaction.message.id === gData.msgId)
             RemoveRole()
 
 })
@@ -376,7 +460,7 @@ function GetText(h_message, type) {
                 if (webMsg.message != 'OK') {
 
                     setTimeout(GetText, 5000, h_message, type)
-    
+
                     return
                 }
 
@@ -409,21 +493,21 @@ async function FormText(h_message, type) {
     BotMsgText += "*Last Update:* __*" + new Date().toLocaleString("en-GB", { timeZone: "America/Argentina/Buenos_Aires" }) + "*__\n"
     BotMsgText += "----------------------------------------------------------------"
 
-    var aData = guildsData.get(h_message.guild.id)
+    gData = guildsData.get(h_message.guild.id)
 
     if (type == CREATE) {
 
         h_message.channel.send(BotMsgText).then(msgid => {
 
-            aData.msgId = msgid.id
+            gData.msgId = msgid.id
 
-            aData.channelId = msgid.channel.id
+            gData.channelId = msgid.channel.id
 
-            aData['intervalId'] = setInterval(UpdateMsg, 900000, msgid)
+            gData['intervalId'] = setInterval(UpdateMsg, 900000, msgid)
 
             msgid.react("⛽")
 
-            db.query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${aData.cmdPrefix}', msgId='${aData.msgId}', channelId='${aData.channelId}' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
+            db.query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${gData.cmdPrefix}', msgId='${gData.msgId}', channelId='${gData.channelId}' WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
 
         }).catch(error => console.log(error))
     }
@@ -431,11 +515,11 @@ async function FormText(h_message, type) {
 
         h_message.edit(BotMsgText).then(r => {
 
-            if (avgGwei <= aData.notiMsgMax) {
+            if (avgGwei <= gData.notiMsgMax) {
 
-                if (aData.notiMsgId) {
+                if (gData.notiMsgId) {
 
-                    h_message.channel.messages.fetch(aData.notiMsgId).then(msgid => {
+                    h_message.channel.messages.fetch(gData.notiMsgId).then(msgid => {
 
                         if (msgid)
                             msgid.delete().catch(error => console.log(error))
@@ -448,9 +532,9 @@ async function FormText(h_message, type) {
 
                 h_message.channel.send(`Low gas price ${role} - ${new Date().toLocaleString("en-GB", { timeZone: "America/Argentina/Buenos_Aires" })}`).then(msgid => {
 
-                    aData.notiMsgId = msgid.id
+                    gData.notiMsgId = msgid.id
 
-                    db.query(`UPDATE ${dbConfig.db_tableS} SET notiMsgId='${aData.notiMsgId}' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
+                    db.query(`UPDATE ${dbConfig.db_tableS} SET notiMsgId='${gData.notiMsgId}' WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
                 })
             }
         })
