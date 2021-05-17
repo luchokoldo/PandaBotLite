@@ -243,7 +243,7 @@ client.on('message', async (message) => {
 
             gData.notiMsgMax = Number(buffer[1])
 
-            await db.query(`UPDATE ${dbConfig.db_tableS} SET notiMsgMax='${gData.notiMsgMax}' WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
+            db.query(`UPDATE ${dbConfig.db_tableS} SET notiMsgMax=${gData.notiMsgMax} WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
 
         }
 
@@ -270,7 +270,7 @@ client.on('message', async (message) => {
 
         clearInterval(gData.intervalId)
 
-        await db.query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='!', msgId='', notiMsgId='', notiMsgMax='60', channelId='' WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
+        await db.query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='!', msgId='', notiMsgId='', notiMsgMax=60, channelId='' WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
     }
 
     if (message.channel.id == gData.channelId)
@@ -538,6 +538,5 @@ async function FormText(h_message, type) {
                 })
             }
         })
-
     }
 }
