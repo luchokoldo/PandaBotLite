@@ -1,10 +1,3 @@
-CREATE TABLE Guilds (
-
-    guildId VARCHAR(100) NOT NULL PRIMARY KEY,
-    createDate VARCHAR(50) NOT NULL
-
-);
-
 CREATE TABLE GuildConfig (
 
     guildId VARCHAR(100) NOT NULL PRIMARY KEY,  

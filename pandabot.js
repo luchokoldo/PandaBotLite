@@ -1,7 +1,6 @@
 const Discord = require('discord.js')
 const fetch = require('node-fetch')
 const pjson = require('./package.json')
-const dbConfig = require("./database/dbconfig.json")
 const db = require('./database/db')
 require('dotenv').config()
 
@@ -20,12 +19,7 @@ var lowGwei, avgGwei, highGwei, ethPrice, blockReward, lastBlock; //etherscan
 
     try {
 
-        await db.Query(`CREATE TABLE IF NOT EXISTS ${dbConfig.db_tableP} (
-            guildId VARCHAR(100) NOT NULL PRIMARY KEY, 
-            createDate VARCHAR(50) NOT NULL       
-        );`)
-
-        await db.Query(`CREATE TABLE IF NOT EXISTS ${dbConfig.db_tableS} (        
+        await db.Query(`CREATE TABLE IF NOT EXISTS ${db.table} (        
             guildId VARCHAR(100) NOT NULL PRIMARY KEY,  
             cmdPrefix VARCHAR(10) DEFAULT '!',
             msgId VARCHAR(100) DEFAULT '',
@@ -48,7 +42,7 @@ client.on('ready', () => {
 
     client.guilds.cache.forEach(guild => {
 
-        db.Query(`SELECT * FROM ${dbConfig.db_tableS} WHERE guildId = '${guild.id}';`).then(result => {
+        db.Query(`SELECT * FROM ${db.table} WHERE guildId = '${guild.id}';`).then(result => {
 
             if (result[0][0].channelId === '') {
 
@@ -76,11 +70,9 @@ client.on('guildCreate', async (guild) => {
 
     try {
 
-        await db.Query(`INSERT INTO ${dbConfig.db_tableP} VALUES( '${guild.id}', '${new Date().toLocaleString("en-GB", { timeZone: "America/Argentina/Buenos_Aires" })}' );`)
+        await db.Query(`INSERT INTO ${db.table} (guildId) VALUES( '${guild.id}' );`)
 
-        await db.Query(`INSERT INTO ${dbConfig.db_tableS} (guildId) VALUES( '${guild.id}' );`)
-
-        let result = await db.Query(`SELECT * FROM ${dbConfig.db_tableS} WHERE guildId = '${guild.id}';`)
+        let result = await db.Query(`SELECT * FROM ${db.table} WHERE guildId = '${guild.id}';`)
 
         guildsData.set(guild.id, result[0][0])
 
@@ -132,9 +124,9 @@ client.on('message', async (message) => {
         }
         else if (MsgText.startsWith(`${aData.cmdPrefix}pandahelp`)) {
 
-            message.channel.send(`Comandos disponibles: \n
+            message.channel.send(`Comandos disponibles(Solo Administradores): \n
             ***${aData.cmdPrefix}pandabot***: Muestra el Autor y la version del bot\n
-            ***${aData.cmdPrefix}register***: Agregar canal para que solo el bot publique y el rol de notificacion\n
+            ***${aData.cmdPrefix}register***: Agregar canal para que solo el bot publique, tambien agrega el rol de notificacion\n
             ***${aData.cmdPrefix}unregister***: Remueve el canal agregado al bot y el rol\n
             ***${aData.cmdPrefix}update***: Actualiza los datos\n
             ***${aData.cmdPrefix}gasprice***: Cambia el valor para mandar la alerta; si el valor Avg es igual o menor, envia la alerta uso: ${aData.cmdPrefix}gasprice 50\n
@@ -144,7 +136,7 @@ client.on('message', async (message) => {
             return
 
         }
-        else if (MsgText.startsWith(`${aData.cmdPrefix}pbprefix`)) {
+        else if (MsgText.startsWith(`${aData.cmdPrefix}pbprefix`) && message.member.hasPermission("ADMINISTRATOR")) {
 
             message.delete();
 
@@ -154,7 +146,9 @@ client.on('message', async (message) => {
 
                 aData.cmdPrefix = buffer[1]
 
-                await db.Query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${aData.cmdPrefix}' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
+                await db.Query(`UPDATE ${db.table} SET cmdPrefix='${aData.cmdPrefix}' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
+
+                message.channel.send(`Prefijo cambiado a ***${aData.cmdPrefix}***`)
 
             }
 
@@ -235,7 +229,7 @@ client.on('message', async (message) => {
 
         aData.msgId = ''
 
-        await db.Query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${aData.cmdPrefix}', msgId='', notiMsgId='', channelId='' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
+        await db.Query(`UPDATE ${db.table} SET cmdPrefix='${aData.cmdPrefix}', msgId='', notiMsgId='', channelId='' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
 
         let role = message.guild.roles.cache.find(role => role.name === GASROLE)
 
@@ -254,7 +248,14 @@ client.on('message', async (message) => {
 
             aData.notiMsgMax = Number(buffer[1])
 
-            await db.Query(`UPDATE ${dbConfig.db_tableS} SET notiMsgMax='${aData.notiMsgMax}' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
+            await db.Query(`UPDATE ${db.table} SET notiMsgMax='${aData.notiMsgMax}' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
+
+            if (aData.msgId != '') {
+
+                let handler = await message.channel.messages.fetch(aData.msgId)
+    
+                UpdateMsg(handler)
+            }
 
         }
 
@@ -267,7 +268,7 @@ client.on('message', async (message) => {
 
 client.on('guildDelete', async (guild) => {
 
-    db.Query(`DELETE FROM ${dbConfig.db_tableS} WHERE guildId=${guild.id};`).catch(error => console.log(error))
+    db.Query(`DELETE FROM ${db.table} WHERE guildId=${guild.id};`).catch(error => console.log(error))
 
 })
 
@@ -300,7 +301,7 @@ client.on('messageDelete', async (message) => {
 
         aData.notiMsgId = ''
 
-        db.Query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${aData.cmdPrefix}', msgId='', notiMsgId='', channelId='' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
+        db.Query(`UPDATE ${db.table} SET cmdPrefix='${aData.cmdPrefix}', msgId='', notiMsgId='', channelId='' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
 
         let role = message.guild.roles.cache.find(role => role.name === GASROLE)
 
@@ -455,6 +456,8 @@ function GetText(h_message, type) {
 
 async function FormText(h_message, type) {
 
+    let aData = guildsData.get(h_message.guild.id)
+
     BotMsgText = ""
 
     BotMsgText += ". \n"
@@ -468,10 +471,9 @@ async function FormText(h_message, type) {
     BotMsgText += "_High:_ ***" + highGwei + "*** _Gwei -_ ***" + ((highGwei * TXPRICE) * ethPrice).toFixed(2) + "*** _USD_\n\n"
 
     BotMsgText += "----------------------------------------------------------------\n"
+    BotMsgText += "*Gas Price Alert:* ***" + aData.notiMsgMax + "*** _Gwei_\n"
     BotMsgText += "*Last Update:* __*" + new Date().toLocaleString("en-GB", { timeZone: "America/Argentina/Buenos_Aires" }) + "*__\n"
     BotMsgText += "----------------------------------------------------------------"
-
-    let aData = guildsData.get(h_message.guild.id)
 
     if (type == CREATE) {
 
@@ -485,7 +487,7 @@ async function FormText(h_message, type) {
 
             msgid.react("⛽")
 
-            db.Query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${aData.cmdPrefix}', msgId='${aData.msgId}', channelId='${aData.channelId}' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
+            db.Query(`UPDATE ${db.table} SET cmdPrefix='${aData.cmdPrefix}', msgId='${aData.msgId}', channelId='${aData.channelId}' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
 
         }).catch(error => console.log(error))
     }
@@ -507,7 +509,7 @@ async function FormText(h_message, type) {
 
                     aData.notiMsgId = msgid.id
 
-                    db.Query(`UPDATE ${dbConfig.db_tableS} SET notiMsgId='${aData.notiMsgId}' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
+                    db.Query(`UPDATE ${db.table} SET notiMsgId='${aData.notiMsgId}' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
                 })
             }
         })
@@ -540,7 +542,7 @@ function SetDefault(guild) {
 
     guildsData.set(guild.id, Data)
 
-    db.Query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='!', msgId='', notiMsgId='', notiMsgMax=60, channelId='' WHERE guildId=${Data.guildId};`).catch(error => console.log(error))
+    db.Query(`UPDATE ${db.table} SET cmdPrefix='!', msgId='', notiMsgId='', notiMsgMax=60, channelId='' WHERE guildId=${Data.guildId};`).catch(error => console.log(error))
 
     return
 }
