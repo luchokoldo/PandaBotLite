@@ -133,13 +133,13 @@ client.on('message', async (message) => {
         else if (MsgText.startsWith(`${aData.cmdPrefix}pandahelp`)) {
 
             message.channel.send(`Comandos disponibles: \n
-            ${aData.cmdPrefix}***pandabot***: Muestra el Autor y la version del bot\n
-            ${aData.cmdPrefix}***register***: Agregar canal para que solo el bot publique y el rol de notificacion\n
-            ${aData.cmdPrefix}***unregister***: Remueve el canal agregado al bot y el rol\n
-            ${aData.cmdPrefix}***update***: Actualiza los datos\n
-            ${aData.cmdPrefix}***gasprice***: Cambia el valor para mandar la alerta; si el valor Avg es igual o menor, envia la alerta uso: ${aData.cmdPrefix}gasprice 50\n
-            ${aData.cmdPrefix}***pbprefix***: Cambia el prefijo de los comandos; uso: ${aData.cmdPrefix}pbprefix !!\n
-            ${aData.cmdPrefix}***pbrestart***: reinicia todos los valores a default\n`)
+            ***${aData.cmdPrefix}pandabot***: Muestra el Autor y la version del bot\n
+            ***${aData.cmdPrefix}register***: Agregar canal para que solo el bot publique y el rol de notificacion\n
+            ***${aData.cmdPrefix}unregister***: Remueve el canal agregado al bot y el rol\n
+            ***${aData.cmdPrefix}update***: Actualiza los datos\n
+            ***${aData.cmdPrefix}gasprice***: Cambia el valor para mandar la alerta; si el valor Avg es igual o menor, envia la alerta uso: ${aData.cmdPrefix}gasprice 50\n
+            ***${aData.cmdPrefix}pbprefix***: Cambia el prefijo de los comandos; uso: ${aData.cmdPrefix}pbprefix !!\n
+            ***${aData.cmdPrefix}pbrestart***: reinicia todos los valores a default\n`)
 
             return
 
