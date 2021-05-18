@@ -1,13 +1,12 @@
-const Discord = require('discord.js');
+const Discord = require('discord.js')
 const fetch = require('node-fetch')
-const pjson = require('./package.json');
-const dbConfig = require("./database/dbconfig.json");
+const pjson = require('./package.json')
+const dbConfig = require("./database/dbconfig.json")
 const db = require('./database/db')
 require('dotenv').config()
 
-const client = new Discord.Client({ partials: ['MESSAGE', 'REACTION'] });
+const client = new Discord.Client({ partials: ['MESSAGE', 'REACTION'] })
 const guildsData = new Map()
-var gData
 
 const TXPRICE = 0.00002100, CREATE = 0, UPDATE = 1
 
@@ -45,7 +44,7 @@ client.on('ready', () => {
 
     console.log(`${client.user.tag} Ready`);
 
-    var channelID
+    let channelID
 
     client.guilds.cache.forEach(guild => {
 
@@ -53,7 +52,7 @@ client.on('ready', () => {
 
             if (result[0][0].channelId === '') {
 
-                SetDefault(guild.id)
+                SetDefault(guild)
 
                 return
 
@@ -65,7 +64,7 @@ client.on('ready', () => {
 
                 result[0][0]['intervalId'] = setInterval(UpdateMsg, 900000, r)
 
-                guildsData.set(guild, result[0][0])
+                guildsData.set(guild.id, result[0][0])
 
             }).catch(() => SetDefault(guild))
 
@@ -97,11 +96,32 @@ client.on('message', async (message) => {
 
     MsgText = String(message.content).toLowerCase()
 
-    gData = guildsData.get(message.guild.id)
+    let aData = guildsData.get(message.guild.id)
 
-    if (message.channel.id != gData.channelId) {
+    if (MsgText.startsWith(`${aData.cmdPrefix}restart`) && message.member.hasPermission("ADMINISTRATOR")) {
 
-        if (MsgText.startsWith(`${gData.cmdPrefix}pandabot`)) {
+        message.delete();
+
+        let role = message.guild.roles.cache.find(role => role.name === GASROLE)
+
+        if (role != null)
+            role.delete()
+
+        clearInterval(aData.intervalId)
+
+        if(aData.msgId)
+            message.channel.messages.fetch(aData.msgId).then(msgid => msgid.delete()).catch()
+
+        if(aData.notiMsgId)
+            message.channel.messages.fetch(aData.notiMsgId).then(msgid => msgid.delete()).catch()
+
+        SetDefault(message.guild)
+
+        return
+    }
+    else if (message.channel.id != aData.channelId) {
+
+        if (MsgText.startsWith(`${aData.cmdPrefix}pandabot`)) {
 
             message.delete();
 
@@ -110,20 +130,21 @@ client.on('message', async (message) => {
             return
 
         }
-        else if (MsgText.startsWith(`${gData.cmdPrefix}pandahelp`)) {
+        else if (MsgText.startsWith(`${aData.cmdPrefix}pandahelp`)) {
 
             message.channel.send(`Comandos disponibles: \n
-            ${gData.cmdPrefix}pandabot: Muestra el Autor y la Version del bot\n
-            ${gData.cmdPrefix}register: Agregar canal para que solo el bot publique y el rol de notificacion\n
-            ${gData.cmdPrefix}unregister: Remueve el canal agregado al bot y el rol\n
-            ${gData.cmdPrefix}update: Actualiza los datos\n
-            ${gData.cmdPrefix}gasprice: Cambia el valor para mandar la alerta; si el valor Avg es igual o menor, envia la alerta uso: ${gData.cmdPrefix}gasprice 50\n
-            ${gData.cmdPrefix}pbprefix: Cambia el prefijo de los comandos; uso: ${gData.cmdPrefix}pbprefix !!\n`)
+            ${aData.cmdPrefix}***pandabot***: Muestra el Autor y la version del bot\n
+            ${aData.cmdPrefix}***register***: Agregar canal para que solo el bot publique y el rol de notificacion\n
+            ${aData.cmdPrefix}***unregister***: Remueve el canal agregado al bot y el rol\n
+            ${aData.cmdPrefix}***update***: Actualiza los datos\n
+            ${aData.cmdPrefix}***gasprice***: Cambia el valor para mandar la alerta; si el valor Avg es igual o menor, envia la alerta uso: ${aData.cmdPrefix}gasprice 50\n
+            ${aData.cmdPrefix}***pbprefix***: Cambia el prefijo de los comandos; uso: ${aData.cmdPrefix}pbprefix !!\n
+            ${aData.cmdPrefix}***pbrestart***: reinicia todos los valores a default\n`)
 
             return
 
         }
-        else if (MsgText.startsWith(`${gData.cmdPrefix}pbprefix`)) {
+        else if (MsgText.startsWith(`${aData.cmdPrefix}pbprefix`)) {
 
             message.delete();
 
@@ -131,21 +152,21 @@ client.on('message', async (message) => {
 
             if (buffer[1]) {
 
-                gData.cmdPrefix = buffer[1]
+                aData.cmdPrefix = buffer[1]
 
-                await db.Query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${gData.cmdPrefix}' WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
+                await db.Query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${aData.cmdPrefix}' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
 
             }
 
             return
         }
-        else if (MsgText.startsWith(`${gData.cmdPrefix}register`) && message.member.hasPermission("ADMINISTRATOR")) {
+        else if (MsgText.startsWith(`${aData.cmdPrefix}register`) && message.member.hasPermission("ADMINISTRATOR")) {
 
             message.delete();
 
-            if (gData.channelId == "") {
+            if (aData.channelId == "") {
 
-                gData.channelId = message.channel.id
+                aData.channelId = message.channel.id
 
                 if (!message.guild.roles.cache.find(role => role.name === GASROLE)) {
 
@@ -153,7 +174,7 @@ client.on('message', async (message) => {
                         data: {
                             name: GASROLE
                         }
-                    }).catch(error => console.log(error))
+                    }).catch()
 
                 }
 
@@ -174,17 +195,17 @@ client.on('message', async (message) => {
         return;
     }
 
-    if (MsgText.startsWith(`${gData.cmdPrefix}update`)) {
+    if (MsgText.startsWith(`${aData.cmdPrefix}update`)) {
 
         message.delete();
 
-        if (gData.msgId != '') {
+        if (aData.msgId != '') {
 
-            let handler = await message.channel.messages.fetch(gData.msgId)
+            let handler = await message.channel.messages.fetch(aData.msgId)
 
             if (!handler) {
 
-                gData.msgId = ''
+                aData.msgId = ''
 
                 return
             }
@@ -194,28 +215,27 @@ client.on('message', async (message) => {
 
         return
     }
-    else if (MsgText.startsWith(`${gData.cmdPrefix}unregister`)) {
+    else if (MsgText.startsWith(`${aData.cmdPrefix}unregister`)) {
 
         message.delete();
 
-        gData.channelId = ''
+        aData.channelId = ''
 
-        clearInterval(gData.intervalId)
+        clearInterval(aData.intervalId)
 
-        gData.intervalId = null
+        aData.intervalId = null
 
-        message.channel.messages.fetch(gData.msgId).then(msgid => {
+        if(aData.msgId)
+            message.channel.messages.fetch(aData.msgId).then(msgid => msgid.delete()).catch()
 
-            if (msgid)
-                msgid.delete().catch(error => console.log(error))
+        if(aData.notiMsgId)
+            message.channel.messages.fetch(aData.notiMsgId).then(msgid => msgid.delete()).catch()
 
-        }).catch(error => console.log(error))
+        aData.notiMsgId = ''
 
-        gData.msgId = ''
+        aData.msgId = ''
 
-        gData.notiMsgId = ''
-
-        await db.Query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${gData.cmdPrefix}', msgId='', notiMsgId='', channelId='' WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
+        await db.Query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${aData.cmdPrefix}', msgId='', notiMsgId='', channelId='' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
 
         let role = message.guild.roles.cache.find(role => role.name === GASROLE)
 
@@ -224,7 +244,7 @@ client.on('message', async (message) => {
 
         return
     }
-    else if (MsgText.startsWith(`${gData.cmdPrefix}gasprice`)) {
+    else if (MsgText.startsWith(`${aData.cmdPrefix}gasprice`)) {
 
         message.delete();
 
@@ -232,45 +252,22 @@ client.on('message', async (message) => {
 
         if (!Number(buffer[1]).isNaN) {
 
-            gData.notiMsgMax = Number(buffer[1])
+            aData.notiMsgMax = Number(buffer[1])
 
-            db.Query(`UPDATE ${dbConfig.db_tableS} SET notiMsgMax=${gData.notiMsgMax} WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
+            await db.Query(`UPDATE ${dbConfig.db_tableS} SET notiMsgMax='${aData.notiMsgMax}' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
 
         }
 
         return
     }
-    else if (MsgText.startsWith(`${gData.cmdPrefix}restart`)) {
 
-        message.delete();
-
-        let role = message.guild.roles.cache.find(role => role.name === GASROLE)
-
-        if (role != null)
-            role.delete()
-
-        gData.notiMsgMax = 60
-
-        gData.channelId = ''
-
-        gData.intervalId = ''
-
-        gData.msgId = ''
-
-        gData.notiMsgId = ''
-
-        clearInterval(gData.intervalId)
-
-        await db.Query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='!', msgId='', notiMsgId='', notiMsgMax=60, channelId='' WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
-    }
-
-    if (message.channel.id == gData.channelId)
+    if (message.channel.id == aData.channelId)
         message.delete();
 })
 
 client.on('guildDelete', async (guild) => {
 
-    await db.Query(`DELETE FROM ${dbConfig.db_tableS} WHERE guildId=${guild.id};`).catch(error => console.log(error))
+    db.Query(`DELETE FROM ${dbConfig.db_tableS} WHERE guildId=${guild.id};`).catch(error => console.log(error))
 
 })
 
@@ -278,42 +275,32 @@ client.on('messageDelete', async (message) => {
 
     if (!message.client.user.bot) {
 
-        gData = guildsData.get(message.guild.id)
+        let aData = guildsData.get(message.guild.id)
 
-        if (message.id != gData.msgId && message.id != gData.notiMsgId)
+        if (message.id != aData.msgId && message.id != aData.notiMsgId)
             return
-        else if(message.id === gData.notiMsgId) {
+        else if(message.id === aData.notiMsgId) {
 
-            gData.notiMsgId = ''
+            aData.notiMsgId = ''
 
             return
         }
 
-        gData.channelId = ''
+        aData.channelId = ''
 
-        clearInterval(gData.intervalId)
+        clearInterval(aData.intervalId)
 
-        gData.intervalId = ''
+        aData.intervalId = ''
 
-        message.channel.messages.fetch(gData.msgId).then(msgid => {
+        message.channel.messages.fetch(aData.msgId).then(msgid => msgid.delete()).catch()
 
-            if (msgid)
-                msgid.delete().catch(error => console.log(error))
+        message.channel.messages.fetch(aData.notiMsgId).then(msgid => msgid.delete()).catch()
 
-        }).catch(error => console.log(error))
+        aData.msgId = ''
 
-        message.channel.messages.fetch(gData.notiMsgId).then(msgid => {
+        aData.notiMsgId = ''
 
-            if (msgid)
-                msgid.delete().catch(error => console.log(error))
-
-        }).catch(error => console.log(error))
-
-        gData.msgId = ''
-
-        gData.notiMsgId = ''
-
-        await db.Query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${gData.cmdPrefix}', msgId='', notiMsgId='', channelId='' WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
+        db.Query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${aData.cmdPrefix}', msgId='', notiMsgId='', channelId='' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
 
         let role = message.guild.roles.cache.find(role => role.name === GASROLE)
 
@@ -344,7 +331,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
 
     }
 
-    gData = guildsData.get(reaction.message.guild.id)
+    let aData = guildsData.get(reaction.message.guild.id)
 
     if (reaction.message.partial) {
 
@@ -352,14 +339,14 @@ client.on('messageReactionAdd', async (reaction, user) => {
 
             let msg = await reaction.message.fetch()
 
-            if (msg.id === gData.msgId)
+            if (msg.id === aData.msgId)
                 ApplyRole()
 
         }
         catch (error) { console.log(error) }
     }
     else
-        if (reaction.message.id === gData.msgId)
+        if (reaction.message.id === aData.msgId)
             ApplyRole()
 
 })
@@ -384,7 +371,7 @@ client.on('messageReactionRemove', async (reaction, user) => {
 
     }
 
-    gData = guildsData.get(reaction.message.guild.id)
+    let aData = guildsData.get(reaction.message.guild.id)
 
     if (reaction.message.partial) {
 
@@ -392,14 +379,14 @@ client.on('messageReactionRemove', async (reaction, user) => {
 
             let msg = await reaction.message.fetch()
 
-            if (msg.id === gData.msgId)
+            if (msg.id === aData.msgId)
                 RemoveRole()
 
         }
         catch (error) { console.log(error) }
     }
     else
-        if (reaction.message.id === gData.msgId)
+        if (reaction.message.id === aData.msgId)
             RemoveRole()
 
 })
@@ -484,21 +471,21 @@ async function FormText(h_message, type) {
     BotMsgText += "*Last Update:* __*" + new Date().toLocaleString("en-GB", { timeZone: "America/Argentina/Buenos_Aires" }) + "*__\n"
     BotMsgText += "----------------------------------------------------------------"
 
-    gData = guildsData.get(h_message.guild.id)
+    let aData = guildsData.get(h_message.guild.id)
 
     if (type == CREATE) {
 
         h_message.channel.send(BotMsgText).then(msgid => {
 
-            gData.msgId = msgid.id
+            aData.msgId = msgid.id
 
-            gData.channelId = msgid.channel.id
+            aData.channelId = msgid.channel.id
 
-            gData['intervalId'] = setInterval(UpdateMsg, 900000, msgid)
+            aData['intervalId'] = setInterval(UpdateMsg, 900000, msgid)
 
             msgid.react("⛽")
 
-            db.Query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${gData.cmdPrefix}', msgId='${gData.msgId}', channelId='${gData.channelId}' WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
+            db.Query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='${aData.cmdPrefix}', msgId='${aData.msgId}', channelId='${aData.channelId}' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
 
         }).catch(error => console.log(error))
     }
@@ -506,16 +493,11 @@ async function FormText(h_message, type) {
 
         h_message.edit(BotMsgText).then(r => {
 
-            if (avgGwei <= gData.notiMsgMax) {
+            if (avgGwei <= aData.notiMsgMax) {
 
-                if (gData.notiMsgId) {
+                if (aData.notiMsgId) {
 
-                    h_message.channel.messages.fetch(gData.notiMsgId).then(msgid => {
-
-                        if (msgid)
-                            msgid.delete().catch(error => console.log(error))
-
-                    }).catch(error => console.log(error))
+                    h_message.channel.messages.fetch(aData.notiMsgId).then(msgid => msgid.delete()).catch()
 
                 }
 
@@ -523,13 +505,13 @@ async function FormText(h_message, type) {
 
                 h_message.channel.send(`Low gas price ${role} - ${new Date().toLocaleString("en-GB", { timeZone: "America/Argentina/Buenos_Aires" })}`).then(msgid => {
 
-                    gData.notiMsgId = msgid.id
+                    aData.notiMsgId = msgid.id
 
-                    db.Query(`UPDATE ${dbConfig.db_tableS} SET notiMsgId='${gData.notiMsgId}' WHERE guildId=${gData.guildId};`).catch(error => console.log(error))
-
+                    db.Query(`UPDATE ${dbConfig.db_tableS} SET notiMsgId='${aData.notiMsgId}' WHERE guildId=${aData.guildId};`).catch(error => console.log(error))
                 })
             }
         })
+
     }
 }
 
@@ -557,6 +539,8 @@ function SetDefault(guild) {
     Data['guildId'] = guild.id
 
     guildsData.set(guild.id, Data)
+
+    db.Query(`UPDATE ${dbConfig.db_tableS} SET cmdPrefix='!', msgId='', notiMsgId='', notiMsgMax=60, channelId='' WHERE guildId=${Data.guildId};`).catch(error => console.log(error))
 
     return
 }
