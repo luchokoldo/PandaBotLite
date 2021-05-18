@@ -98,7 +98,7 @@ client.on('message', async (message) => {
 
     let aData = guildsData.get(message.guild.id)
 
-    if (MsgText.startsWith(`${aData.cmdPrefix}restart`) && message.member.hasPermission("ADMINISTRATOR")) {
+    if (MsgText.startsWith(`${aData.cmdPrefix}pbrestart`) && message.member.hasPermission("ADMINISTRATOR")) {
 
         message.delete();
 
